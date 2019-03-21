@@ -366,9 +366,15 @@ const ctxLogKey ctxKeyType = iota
 // Logger gets a contextual logger from current context.
 // contextual logger will output common fields from context.
 func Logger(ctx context.Context) *zap.Logger {
-	if ctxlogger, ok := ctx.Value(ctxLogKey).(*zap.Logger); ok {
+	ctxLogVal := ctx.Value(ctxLogKey)
+	if ctxLogVal == nil {
+		return zaplog.L()
+	}
+
+	if ctxlogger, ok := ctxLogVal.(*zap.Logger); ok {
 		return ctxlogger
 	}
+
 	return zaplog.L()
 }
 
