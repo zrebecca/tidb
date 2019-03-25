@@ -296,8 +296,8 @@ func (s *session) FieldList(tableName string) ([]*ast.ResultField, error) {
 		rf := &ast.ResultField{
 			ColumnAsName: col.Name,
 			TableAsName:  tName,
-			DBName:       dbName,
-			Table:        table.Meta(),
+			DBName:       dbName.O,
+			Table:        table.Meta().Name.O,
 			Column:       col.ColumnInfo,
 		}
 		fields = append(fields, rf)

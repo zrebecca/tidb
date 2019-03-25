@@ -67,13 +67,8 @@ func schema2ResultFields(schema *expression.Schema, defaultDB string) (rfs []*as
 	schemaLen := schema.Len()
 	rfs = make([]*ast.ResultField, schemaLen)
 	rfSpan := make([]ast.ResultField, schemaLen)
-	tbSpan := make([]model.TableInfo, schemaLen)
 	colSpan := make([]model.ColumnInfo, schemaLen)
 	for i, col := range schema.Columns {
-		dbName := col.DBName.O
-		if dbName == "" && col.TblName.L != "" {
-			dbName = defaultDB
-		}
 		origColName := col.OrigColName
 		if origColName.L == "" {
 			origColName = col.ColName
@@ -81,11 +76,14 @@ func schema2ResultFields(schema *expression.Schema, defaultDB string) (rfs []*as
 		rf := &rfSpan[i]
 		rf.ColumnAsName = col.ColName
 		rf.TableAsName = col.TblName
-		rf.DBName = model.NewCIStr(dbName)
 
-		tb := &tbSpan[i]
-		tb.Name = col.OrigTblName
-		rf.Table = tb
+		dbName := col.DBName.O
+		if dbName == "" && col.TblName.L != "" {
+			dbName = defaultDB
+		}
+		rf.DBName = dbName
+
+		rf.Table = col.OrigTblName.O
 
 		c := &colSpan[i]
 		c.FieldType = *col.RetType

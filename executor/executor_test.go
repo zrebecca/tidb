@@ -1986,9 +1986,9 @@ func (s *testSuite) TestColumnName(c *C) {
 	fields = rs.Fields()
 	c.Check(fields[0].Column.Name.L, Equals, "c")
 	c.Check(fields[0].ColumnAsName.L, Equals, "a")
-	c.Check(fields[0].Table.Name.L, Equals, "t")
+	c.Check(fields[0].Table, Equals, "t")
 	c.Check(fields[0].TableAsName.L, Equals, "t2")
-	c.Check(fields[0].DBName.L, Equals, "test")
+	c.Check(fields[0].DBName, Equals, "test")
 	rs.Close()
 	// Test case for query a expression which only using constant inputs.
 	// In this case, the table, org_table and database attributes will all be empty.
@@ -1997,9 +1997,9 @@ func (s *testSuite) TestColumnName(c *C) {
 	fields = rs.Fields()
 	c.Check(fields[0].Column.Name.L, Equals, "a")
 	c.Check(fields[0].ColumnAsName.L, Equals, "a")
-	c.Check(fields[0].Table.Name.L, Equals, "")
+	c.Check(fields[0].Table, Equals, "")
 	c.Check(fields[0].TableAsName.L, Equals, "")
-	c.Check(fields[0].DBName.L, Equals, "")
+	c.Check(fields[0].DBName, Equals, "")
 	rs.Close()
 	// Test case for query a column wrapped with parentheses and unary plus.
 	// In this case, the column name should be its original name.

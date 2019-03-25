@@ -44,7 +44,7 @@ func (nr *nameResolver) Leave(inNode ast.Node) (node ast.Node, ok bool) {
 			if col.Name.L == v.Name.Name.L {
 				v.Refer = &ast.ResultField{
 					Column: col,
-					Table:  nr.tableInfo,
+					Table:  nr.tableInfo.Name.O,
 				}
 				return inNode, true
 			}

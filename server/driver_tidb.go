@@ -544,17 +544,12 @@ func convertColumnInfo(ci *ColumnInfo, fld *ast.ResultField) *ColumnInfo {
 		colType = mysql.TypeVarString
 	}
 
-	var orgTable string
-	if fld.Table != nil {
-		orgTable = fld.Table.Name.O
-	}
-
 	*ci = ColumnInfo{
 		Name:         fld.ColumnAsName.O,
 		OrgName:      fld.Column.Name.O,
 		Table:        fld.TableAsName.O,
-		OrgTable:     orgTable,
-		Schema:       fld.DBName.O,
+		OrgTable:     fld.Table,
+		Schema:       fld.DBName,
 		Flag:         uint16(fld.Column.Flag),
 		Type:         colType,
 		Decimal:      colDecimal,

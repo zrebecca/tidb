@@ -61,7 +61,7 @@ func (ts tidbResultSetTestSuite) TestConvertColumnInfo(c *C) {
 		},
 		ColumnAsName: model.NewCIStr("a"),
 		TableAsName:  model.NewCIStr("dual"),
-		DBName:       model.NewCIStr("test"),
+		DBName:       "test",
 	}
 	colInfo := convertColumnInfo(&resultField)
 	c.Assert(colInfo, DeepEquals, createColumnByTypeAndLen(mysql.TypeBit, 1))
@@ -84,7 +84,7 @@ func (ts tidbResultSetTestSuite) TestConvertColumnInfo(c *C) {
 		},
 		ColumnAsName: model.NewCIStr("a"),
 		TableAsName:  model.NewCIStr("dual"),
-		DBName:       model.NewCIStr("test"),
+		DBName:       "test",
 	}
 	colInfo = convertColumnInfo(&resultField)
 	c.Assert(colInfo, DeepEquals, createColumnByTypeAndLen(mysql.TypeTiny, 1))
@@ -106,7 +106,7 @@ func (ts tidbResultSetTestSuite) TestConvertColumnInfo(c *C) {
 		},
 		ColumnAsName: model.NewCIStr("a"),
 		TableAsName:  model.NewCIStr("dual"),
-		DBName:       model.NewCIStr("test"),
+		DBName:       "test",
 	}
 	colInfo = convertColumnInfo(&resultField)
 	c.Assert(colInfo.ColumnLength, Equals, uint32(4))
