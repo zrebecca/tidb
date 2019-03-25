@@ -419,7 +419,9 @@ func (s *Server) ShowProcessList() map[uint64]*util.ProcessInfo {
 			continue
 		}
 		pi := client.ctx.ShowProcess()
-		rs[pi.ID] = pi
+		if pi != nil {
+			rs[pi.ID] = pi
+		}
 	}
 	s.rwlock.RUnlock()
 	return rs
