@@ -232,8 +232,6 @@ func (b *PlanBuilder) buildExecute(v *ast.ExecuteStmt) (Plan, error) {
 			driver.ValueExprPool.Put(valueExpr)
 		}
 	}
-	driver.UsingVarsNodePool.Put(v.UsingVars[:0])
-	v.UsingVars = nil
 	exe := &Execute{Name: v.Name, UsingVars: vars, ExecID: v.ExecID}
 	return exe, nil
 }
