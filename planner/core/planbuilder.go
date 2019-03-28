@@ -16,9 +16,6 @@ package core
 import (
 	"bytes"
 	"fmt"
-	"strings"
-	"sync"
-
 	"github.com/cznic/mathutil"
 	"github.com/pingcap/errors"
 	"github.com/pingcap/parser/ast"
@@ -36,6 +33,7 @@ import (
 	"github.com/pingcap/tidb/types/parser_driver"
 	"github.com/pingcap/tidb/util/ranger"
 	"github.com/pingcap/tidb/util/schemautil"
+	"strings"
 )
 
 type visitInfo struct {
@@ -222,15 +220,8 @@ func (b *PlanBuilder) Build(node ast.Node) (Plan, error) {
 	return nil, ErrUnsupportedType.GenWithStack("Unsupported type %T", node)
 }
 
-var UsingVarsNode1Pool = sync.Pool{
-	New: func() interface{} {
-		var expr []expression.Expression
-		return expr
-	},
-}
-
 func (b *PlanBuilder) buildExecute(v *ast.ExecuteStmt) (Plan, error) {
-	vars := UsingVarsNode1Pool.Get().([]expression.Expression)
+	vars := make([]expression.Expression, 0, len(v.UsingVars))
 	for _, expr := range v.UsingVars {
 		newExpr, _, err := b.rewrite(expr, nil, nil, true)
 		if err != nil {
