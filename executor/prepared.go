@@ -260,7 +260,7 @@ func CompileExecutePreparedStmt(ctx sessionctx.Context, ID uint32, args ...inter
 	}
 	execStmt.UsingVars = make([]ast.ExprNode, len(args))
 	for i, val := range args {
-		execStmt.UsingVars[i] = driver.NewValueExprFromPool(val)
+		execStmt.UsingVars[i] = ast.NewValueExpr(val)
 	}
 	is := GetInfoSchema(ctx)
 	execPlan, err := planner.Optimize(ctx, execStmt, is)

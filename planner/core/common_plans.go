@@ -151,8 +151,6 @@ type Execute struct {
 	Plan      Plan
 }
 
-var noUsed chunk.Row
-
 // OptimizePreparedPlan optimizes the prepared statement.
 func (e *Execute) OptimizePreparedPlan(ctx sessionctx.Context, is infoschema.InfoSchema) error {
 	vars := ctx.GetSessionVars()
@@ -169,7 +167,7 @@ func (e *Execute) OptimizePreparedPlan(ctx sessionctx.Context, is infoschema.Inf
 	}
 
 	for i, usingVar := range e.UsingVars {
-		val, err := usingVar.Eval(noUsed)
+		val, err := usingVar.Eval(chunk.Row{})
 		if err != nil {
 			return errors.Trace(err)
 		}

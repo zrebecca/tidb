@@ -87,13 +87,11 @@ func (c *Constant) GetType() *types.FieldType {
 	return c.RetType
 }
 
-var noUse chunk.Row
-
 // Eval implements Expression interface.
 func (c *Constant) Eval(_ chunk.Row) (types.Datum, error) {
 	if c.DeferredExpr != nil {
 		if sf, sfOK := c.DeferredExpr.(*ScalarFunction); sfOK {
-			dt, err := sf.Eval(noUse)
+			dt, err := sf.Eval(chunk.Row{})
 			if err != nil {
 				return c.Value, err
 			}

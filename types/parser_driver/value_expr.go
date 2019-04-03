@@ -15,16 +15,14 @@ package driver
 
 import (
 	"fmt"
-	"io"
-	"strconv"
-	"sync"
-
 	"github.com/pingcap/errors"
 	"github.com/pingcap/parser/ast"
 	"github.com/pingcap/parser/format"
 	"github.com/pingcap/parser/mysql"
 	"github.com/pingcap/tidb/types"
 	"github.com/pingcap/tidb/util/hack"
+	"io"
+	"strconv"
 )
 
 // The purpose of driver package is to decompose the dependency of the parser and
@@ -57,23 +55,6 @@ func init() {
 		return b, err
 	}
 }
-
-var ValueExprPool = sync.Pool{
-	New: func() interface{} {
-		return &ValueExpr{}
-	},
-}
-
-var UsingVarsNodePool = sync.Pool{
-	New: func() interface{} {
-		var expr []ast.ExprNode
-		return expr
-	},
-}
-
-var (
-	emptyValueExpr = &ValueExpr{}
-)
 
 var (
 	_ ast.ParamMarkerExpr = &ParamMarkerExpr{}
@@ -185,18 +166,6 @@ func newValueExpr(value interface{}) ast.ValueExpr {
 		return ve
 	}
 	ve := &ValueExpr{}
-	ve.SetValue(value)
-	types.DefaultTypeForValue(value, &ve.Type)
-	ve.projectionOffset = -1
-	return ve
-}
-
-func NewValueExprFromPool(value interface{}) ast.ValueExpr {
-	if ve, ok := value.(*ValueExpr); ok {
-		return ve
-	}
-	ve := ValueExprPool.Get().(*ValueExpr)
-	*ve = *emptyValueExpr
 	ve.SetValue(value)
 	types.DefaultTypeForValue(value, &ve.Type)
 	ve.projectionOffset = -1
