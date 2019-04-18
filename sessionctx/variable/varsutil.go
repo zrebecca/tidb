@@ -252,9 +252,9 @@ func checkInt64SystemVar(name, value string, min, max int64, vars *SessionVars) 
 
 const (
 	// initChunkSizeUpperBound indicates upper bound value of tidb_init_chunk_size.
-	initChunkSizeUpperBound = 10
+	initChunkSizeUpperBound = 32
 	// maxChunkSizeLowerBound indicates lower bound value of tidb_max_chunk_size.
-	maxChunkSizeLowerBound = 10
+	maxChunkSizeLowerBound = 32
 )
 
 // ValidateSetSystemVar checks if system variable satisfies specific restriction.

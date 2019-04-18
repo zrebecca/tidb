@@ -263,8 +263,8 @@ const (
 	DefBatchDelete                   = false
 	DefBatchCommit                   = false
 	DefCurretTS                      = 0
-	DefInitChunkSize                 = 1
-	DefMaxChunkSize                  = 10
+	DefInitChunkSize                 = 32
+	DefMaxChunkSize                  = 1024
 	DefDMLBatchSize                  = 20000
 	DefMaxPreparedStmtCount          = -1
 	DefWaitTimeout                   = 28800
