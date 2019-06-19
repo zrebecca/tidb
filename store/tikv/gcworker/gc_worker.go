@@ -452,7 +452,7 @@ func (w *GCWorker) runGCJob(ctx context.Context, safePoint uint64, concurrency i
 		w.done <- errors.Trace(err)
 		return
 	}
-	err = w.deleteRanges(ctx, safePoint, concurrency)
+	err = w.deleteRanges(ctx, safePoint)
 	if err != nil {
 		logutil.Logger(ctx).Error("[gc worker] delete range returns an error",
 			zap.String("uuid", w.uuid),
@@ -461,7 +461,7 @@ func (w *GCWorker) runGCJob(ctx context.Context, safePoint uint64, concurrency i
 		w.done <- errors.Trace(err)
 		return
 	}
-	err = w.redoDeleteRanges(ctx, safePoint, concurrency)
+	err = w.redoDeleteRanges(ctx, safePoint)
 	if err != nil {
 		logutil.Logger(ctx).Error("[gc worker] redo-delete range returns an error",
 			zap.String("uuid", w.uuid),
@@ -508,8 +508,7 @@ func (w *GCWorker) runGCJob(ctx context.Context, safePoint uint64, concurrency i
 }
 
 // deleteRanges processes all delete range records whose ts < safePoint in table `gc_delete_range`
-// `concurrency` specifies the concurrency to send NotifyDeleteRange.
-func (w *GCWorker) deleteRanges(ctx context.Context, safePoint uint64, concurrency int) error {
+func (w *GCWorker) deleteRanges(ctx context.Context, safePoint uint64) error {
 	metrics.GCWorkerCounter.WithLabelValues("delete_range").Inc()
 
 	se := createSession(w.store)
@@ -526,7 +525,7 @@ func (w *GCWorker) deleteRanges(ctx context.Context, safePoint uint64, concurren
 	for _, r := range ranges {
 		startKey, endKey := r.Range()
 
-		err = w.doUnsafeDestroyRangeRequest(ctx, startKey, endKey, concurrency)
+		err = w.sendUnsafeDestroyRangeRequest(ctx, startKey, endKey)
 		if err != nil {
 			return errors.Trace(err)
 		}
@@ -547,8 +546,7 @@ func (w *GCWorker) deleteRanges(ctx context.Context, safePoint uint64, concurren
 }
 
 // redoDeleteRanges checks all deleted ranges whose ts is at least `lifetime + 24h` ago. See TiKV RFC #2.
-// `concurrency` specifies the concurrency to send NotifyDeleteRange.
-func (w *GCWorker) redoDeleteRanges(ctx context.Context, safePoint uint64, concurrency int) error {
+func (w *GCWorker) redoDeleteRanges(ctx context.Context, safePoint uint64) error {
 	metrics.GCWorkerCounter.WithLabelValues("redo_delete_range").Inc()
 
 	// We check delete range records that are deleted about 24 hours ago.
@@ -568,7 +566,7 @@ func (w *GCWorker) redoDeleteRanges(ctx context.Context, safePoint uint64, concu
 	for _, r := range ranges {
 		startKey, endKey := r.Range()
 
-		err = w.doUnsafeDestroyRangeRequest(ctx, startKey, endKey, concurrency)
+		err = w.sendUnsafeDestroyRangeRequest(ctx, startKey, endKey)
 		if err != nil {
 			return errors.Trace(err)
 		}
@@ -588,7 +586,7 @@ func (w *GCWorker) redoDeleteRanges(ctx context.Context, safePoint uint64, concu
 	return nil
 }
 
-func (w *GCWorker) doUnsafeDestroyRangeRequest(ctx context.Context, startKey []byte, endKey []byte, concurrency int) error {
+func (w *GCWorker) sendUnsafeDestroyRangeRequest(ctx context.Context, startKey []byte, endKey []byte) error {
 	// Get all stores every time deleting a region. So the store list is less probably to be stale.
 	stores, err := w.getUpStores(ctx)
 	if err != nil {
@@ -626,17 +624,6 @@ func (w *GCWorker) doUnsafeDestroyRangeRequest(ctx context.Context, startKey []b
 	}
 
 	wg.Wait()
-
-	// Notify all affected regions in the range that UnsafeDestroyRange occurs.
-	notifyTask := tikv.NewNotifyDeleteRangeTask(w.store, startKey, endKey, concurrency)
-	err = notifyTask.Execute(ctx)
-	if err != nil {
-		logutil.Logger(ctx).Error("[gc worker] failed notifying regions affected by UnsafeDestroyRange",
-			zap.String("uuid", w.uuid),
-			zap.Binary("startKey", startKey),
-			zap.Binary("endKey", endKey),
-			zap.Error(err))
-	}
 
 	return errors.Trace(err)
 }
@@ -1328,5 +1315,5 @@ func NewMockGCWorker(store tikv.Storage) (*MockGCWorker, error) {
 // DeleteRanges calls deleteRanges internally, just for test.
 func (w *MockGCWorker) DeleteRanges(ctx context.Context, safePoint uint64) error {
 	logutil.Logger(ctx).Error("deleteRanges is called")
-	return w.worker.deleteRanges(ctx, safePoint, 1)
+	return w.worker.deleteRanges(ctx, safePoint)
 }

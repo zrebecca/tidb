@@ -16,9 +16,9 @@ package tikv
 import (
 	"bytes"
 	"context"
+
 	"github.com/pingcap/errors"
 	"github.com/pingcap/kvproto/pkg/kvrpcpb"
-	"github.com/pingcap/tidb/kv"
 	"github.com/pingcap/tidb/store/tikv/tikvrpc"
 )
 
@@ -27,74 +27,40 @@ import (
 // if the task was canceled or not.
 type DeleteRangeTask struct {
 	completedRegions int
+	canceled         bool
 	store            Storage
+	ctx              context.Context
 	startKey         []byte
 	endKey           []byte
-	notifyOnly       bool
-	concurrency      int
 }
 
-// NewDeleteRangeTask creates a DeleteRangeTask. Deleting will be performed when `Execute` method is invoked.
-// Be careful while using this API. This API doesn't keep recent MVCC versions, but will delete all versions of all keys
-// in the range immediately. Also notice that frequent invocation to this API may cause performance problems to TiKV.
-func NewDeleteRangeTask(store Storage, startKey []byte, endKey []byte, concurrency int) *DeleteRangeTask {
+// NewDeleteRangeTask creates a DeleteRangeTask. Deleting will not be performed right away.
+// WARNING: Currently, this API may leave some waste key-value pairs uncleaned in TiKV. Be careful while using it.
+func NewDeleteRangeTask(ctx context.Context, store Storage, startKey []byte, endKey []byte) *DeleteRangeTask {
 	return &DeleteRangeTask{
 		completedRegions: 0,
+		canceled:         false,
 		store:            store,
+		ctx:              ctx,
 		startKey:         startKey,
 		endKey:           endKey,
-		notifyOnly:       false,
-		concurrency:      concurrency,
 	}
 }
 
-// NewNotifyDeleteRangeTask creates a task that sends delete range requests to all regions in the range, but with the
-// flag `notifyOnly` set. TiKV will not actually delete the range after receiving request, but it will be replicated via
-// raft. This is used to notify the involved regions before sending UnsafeDestroyRange requests.
-func NewNotifyDeleteRangeTask(store Storage, startKey []byte, endKey []byte, concurrency int) *DeleteRangeTask {
-	task := NewDeleteRangeTask(store, startKey, endKey, concurrency)
-	task.notifyOnly = true
-	return task
-}
-
-// getRunnerName returns a name for RangeTaskRunner.
-func (t *DeleteRangeTask) getRunnerName() string {
-	if t.notifyOnly {
-		return "delete-range-notify"
-	}
-	return "delete-range"
-}
-
 // Execute performs the delete range operation.
-func (t *DeleteRangeTask) Execute(ctx context.Context) error {
-	runnerName := t.getRunnerName()
-
-	runner := NewRangeTaskRunner(runnerName, t.store, t.concurrency, t.sendReqOnRange)
-	err := runner.RunOnRange(ctx, t.startKey, t.endKey)
-	t.completedRegions = int(runner.CompletedRegions())
-
-	return err
-}
-
-// Execute performs the delete range operation.
-func (t *DeleteRangeTask) sendReqOnRange(ctx context.Context, r kv.KeyRange) (int, error) {
-	startKey, rangeEndKey := r.StartKey, r.EndKey
-	completedRegions := 0
+func (t *DeleteRangeTask) Execute() error {
+	startKey, rangeEndKey := t.startKey, t.endKey
 	for {
 		select {
-		case <-ctx.Done():
-			return completedRegions, errors.Trace(ctx.Err())
+		case <-t.ctx.Done():
+			t.canceled = true
+			return nil
 		default:
 		}
-
-		if bytes.Compare(startKey, rangeEndKey) >= 0 {
-			break
-		}
-
-		bo := NewBackoffer(ctx, deleteRangeOneRegionMaxBackoff)
+		bo := NewBackoffer(t.ctx, deleteRangeOneRegionMaxBackoff)
 		loc, err := t.store.GetRegionCache().LocateKey(bo, startKey)
 		if err != nil {
-			return completedRegions, errors.Trace(err)
+			return errors.Trace(err)
 		}
 
 		// Delete to the end of the region, except if it's the last region overlapping the range
@@ -107,42 +73,49 @@ func (t *DeleteRangeTask) sendReqOnRange(ctx context.Context, r kv.KeyRange) (in
 		req := &tikvrpc.Request{
 			Type: tikvrpc.CmdDeleteRange,
 			DeleteRange: &kvrpcpb.DeleteRangeRequest{
-				StartKey:   startKey,
-				EndKey:     endKey,
-				NotifyOnly: t.notifyOnly,
+				StartKey: startKey,
+				EndKey:   endKey,
 			},
 		}
 
 		resp, err := t.store.SendReq(bo, req, loc.Region, ReadTimeoutMedium)
 		if err != nil {
-			return completedRegions, errors.Trace(err)
+			return errors.Trace(err)
 		}
 		regionErr, err := resp.GetRegionError()
 		if err != nil {
-			return completedRegions, errors.Trace(err)
+			return errors.Trace(err)
 		}
 		if regionErr != nil {
 			err = bo.Backoff(BoRegionMiss, errors.New(regionErr.String()))
 			if err != nil {
-				return completedRegions, errors.Trace(err)
+				return errors.Trace(err)
 			}
 			continue
 		}
 		deleteRangeResp := resp.DeleteRange
 		if deleteRangeResp == nil {
-			return completedRegions, errors.Trace(ErrBodyMissing)
+			return errors.Trace(ErrBodyMissing)
 		}
 		if err := deleteRangeResp.GetError(); err != "" {
-			return completedRegions, errors.Errorf("unexpected delete range err: %v", err)
+			return errors.Errorf("unexpected delete range err: %v", err)
 		}
-		completedRegions++
+		t.completedRegions++
+		if bytes.Equal(endKey, rangeEndKey) {
+			break
+		}
 		startKey = endKey
 	}
 
-	return completedRegions, nil
+	return nil
 }
 
 // CompletedRegions returns the number of regions that are affected by this delete range task
 func (t *DeleteRangeTask) CompletedRegions() int {
 	return t.completedRegions
+}
+
+// IsCanceled returns true if the delete range operation was canceled on the half way
+func (t *DeleteRangeTask) IsCanceled() bool {
+	return t.canceled
 }

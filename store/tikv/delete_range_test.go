@@ -33,7 +33,7 @@ var _ = Suite(&testDeleteRangeSuite{})
 
 func (s *testDeleteRangeSuite) SetUpTest(c *C) {
 	s.cluster = mocktikv.NewCluster()
-	mocktikv.BootstrapWithMultiRegions(s.cluster, []byte("b"), []byte("c"), []byte("d"))
+	mocktikv.BootstrapWithMultiRegions(s.cluster, []byte("a"), []byte("b"), []byte("c"))
 	client, pdClient, err := mocktikv.NewTiKVAndPDClient(s.cluster, nil, "")
 	c.Assert(err, IsNil)
 
@@ -81,13 +81,12 @@ func (s *testDeleteRangeSuite) checkData(c *C, expectedData map[string]string) {
 	c.Assert(data, DeepEquals, expectedData)
 }
 
-func (s *testDeleteRangeSuite) deleteRange(c *C, startKey []byte, endKey []byte) int {
-	task := NewDeleteRangeTask(s.store, startKey, endKey, 1)
+func (s *testDeleteRangeSuite) deleteRange(c *C, startKey []byte, endKey []byte) {
+	ctx := context.Background()
+	task := NewDeleteRangeTask(ctx, s.store, startKey, endKey)
 
-	err := task.Execute(context.Background())
+	err := task.Execute()
 	c.Assert(err, IsNil)
-
-	return task.CompletedRegions()
 }
 
 // deleteRangeFromMap deletes all keys in a given range from a map
@@ -101,11 +100,10 @@ func deleteRangeFromMap(m map[string]string, startKey []byte, endKey []byte) {
 }
 
 // mustDeleteRange does delete range on both the map and the storage, and assert they are equal after deleting
-func (s *testDeleteRangeSuite) mustDeleteRange(c *C, startKey []byte, endKey []byte, expected map[string]string, regions int) {
-	completedRegions := s.deleteRange(c, startKey, endKey)
+func (s *testDeleteRangeSuite) mustDeleteRange(c *C, startKey []byte, endKey []byte, expected map[string]string) {
+	s.deleteRange(c, startKey, endKey)
 	deleteRangeFromMap(expected, startKey, endKey)
 	s.checkData(c, expected)
-	c.Assert(completedRegions, Equals, regions)
 }
 
 func (s *testDeleteRangeSuite) TestDeleteRange(c *C) {
@@ -121,8 +119,7 @@ func (s *testDeleteRangeSuite) TestDeleteRange(c *C) {
 			key := []byte{byte(i), byte(j)}
 			value := []byte{byte(rand.Intn(256)), byte(rand.Intn(256))}
 			testData[string(key)] = string(value)
-			err := txn.Set(key, value)
-			c.Assert(err, IsNil)
+			txn.Set(key, value)
 		}
 	}
 
@@ -131,10 +128,10 @@ func (s *testDeleteRangeSuite) TestDeleteRange(c *C) {
 
 	s.checkData(c, testData)
 
-	s.mustDeleteRange(c, []byte("b"), []byte("c0"), testData, 2)
-	s.mustDeleteRange(c, []byte("c11"), []byte("c12"), testData, 1)
-	s.mustDeleteRange(c, []byte("d0"), []byte("d0"), testData, 0)
-	s.mustDeleteRange(c, []byte("d0\x00"), []byte("d1\x00"), testData, 1)
-	s.mustDeleteRange(c, []byte("c5"), []byte("d5"), testData, 2)
-	s.mustDeleteRange(c, []byte("a"), []byte("z"), testData, 4)
+	s.mustDeleteRange(c, []byte("b"), []byte("c0"), testData)
+	s.mustDeleteRange(c, []byte("c11"), []byte("c12"), testData)
+	s.mustDeleteRange(c, []byte("d0"), []byte("d0"), testData)
+	s.mustDeleteRange(c, []byte("d0\x00"), []byte("d1\x00"), testData)
+	s.mustDeleteRange(c, []byte("c5"), []byte("d5"), testData)
+	s.mustDeleteRange(c, []byte("a"), []byte("z"), testData)
 }
